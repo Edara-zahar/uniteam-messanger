@@ -1,7 +1,9 @@
 import {useEffect, useState} from "react"
+import axios from "axios"
 import ReqGet from "./reqGet";
 import ReqPost from "./reqPost";
 import ConvertUnix from "./utils"
+import Recorder from 'recorder-js';
 import "./chat/chat.css"
 import "./chat/reset.css"
 
@@ -18,6 +20,56 @@ function App() {
   const [data, setData] = useState([])
   const [message, setMessage] = useState('')
   const [count, setCount] = useState(0)
+
+  const recorder = new Recorder({
+    sampleRate: 44100,
+    numberOfChannels: 1,
+    timeLimit: 600, // ограничение до десяти минуты
+  });
+  
+  const startRecording = () => {
+    recorder.start().then(() => {
+      // запись началась
+    });
+  };
+  
+  const stopRecording = () => {
+    recorder.stop().then(({ blob }) => {
+      const formData = new FormData();
+      formData.append('audio', blob, 'audio.ogg');
+  
+      axios.post("http://messenger.uni-team-inc.online/message/audio", formData)
+        .then((response) => {
+          console.log(response.data);
+          
+          // воспроизводим голосовое сообщение
+          const audio = new Audio(URL.createObjectURL(blob));
+          audio.play();
+          
+          // преобразуем текст в голосовое сообщение
+          const text = response.data.text;
+          const utterance = new SpeechSynthesisUtterance(text);
+          speechSynthesis.speak(utterance);
+        })
+        .catch((error) => {
+          console.log(error);
+          console.log(formData);
+        });
+    });
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    const formData = new FormData();
+    formData.append('image', file);
+    fetch('/upload-image', {
+      method: 'POST',
+      body: formData
+    })
+    .then(response => response.json())
+    .then(data => console.log(data))
+    .catch(error => console.error(error));
+  }
 
   useEffect(() => {
     reqGet()
@@ -56,9 +108,14 @@ function App() {
           )
         })}
       <div className="IntMess">
+      <input className="btn__zacr" type="file" onChange={handleFileChange} value={message}/>
         <input className="ent" placeholder="Написать сообщение..." type="text" value={message} onChange={(e) => setMessage(e.target.value)}
         onKeyDown={handleKeyDown}/>
       <button className="btn" onClick={(e) => reqPost(e)}>Отправить</button>
+
+      <button className="btn__record" id="record-button" onclick={startRecording}>Запись</button>
+      <button className="btn__recordStop" id="stop-button" onclick={stopRecording}>Остановить запись</button>
+
       </div>
     </div>
   );
